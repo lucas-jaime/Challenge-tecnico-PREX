@@ -1,82 +1,44 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
 
+# Configuración de la base de datos SQLite (embebida en la aplicación)
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mi_base_de_datos.db'  # Archivo SQLite local
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Tablas
-class Server(db.Model):
+# Definir el modelo de la base de datos
+class SystemInfo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    ip = db.Column(db.String(50), nullable=False)
-    os_name = db.Column(db.String(100))
-    os_version = db.Column(db.String(100))
     processor = db.Column(db.String(100))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    processes = db.relationship('Process', backref='server', lazy=True)
-    users = db.relationship('User', backref='server', lazy=True)
+    process_list = db.Column(db.String(255))
+    users = db.Column(db.String(255))
+    os_name = db.Column(db.String(100))
+    os_version = db.Column(db.String(50))
 
-class Process(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    server_id = db.Column(db.Integer, db.ForeignKey('server.id'), nullable=False)
-    pid = db.Column(db.Integer)
-    name = db.Column(db.String(100))
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    server_id = db.Column(db.Integer, db.ForeignKey('server.id'), nullable=False)
-    username = db.Column(db.String(100))
-
-@app.before_first_request
-def create_tables():
-    db.create_all()
-
-@app.route('/collect', methods=['POST'])
+# Ruta para recibir los datos del agente
+@app.route('/collect_data', methods=['POST'])
 def collect_data():
-    data = request.json
-    client_ip = request.remote_addr
+    data = request.get_json()
 
-    server = Server(
-        ip=client_ip,
-        os_name=data.get("os_name"),
-        os_version=data.get("os_version"),
-        processor=data.get("processor")
+    # Crear una nueva entrada en la base de datos
+    new_entry = SystemInfo(
+        processor=data['processor'],
+        process_list=str(data['process_list']),
+        users=str(data['users']),
+        os_name=data['os_name'],
+        os_version=data['os_version']
     )
-    db.session.add(server)
-    db.session.commit()
 
-    for process in data.get("processes", []):
-        db.session.add(Process(server_id=server.id, pid=process["pid"], name=process["name"]))
-
-    for username in data.get("users", []):
-        db.session.add(User(server_id=server.id, username=username))
-
-    db.session.commit()
-    return jsonify({"Mensaje": "Datos almacenados correctamente"}), 200
-
-@app.route('/query', methods=['GET'])
-def query_data():
-    ip = request.args.get('ip')
-    if not ip:
-        return jsonify({"Error": "El parámetro IP es requerido"}), 400
-
-    server = Server.query.filter_by(ip=ip).first()
-    if not server:
-        return jsonify({"Error": "No se encontraron datos sobre esta IP"}), 404
-
-    result = {
-        "ip": server.ip,
-        "os_name": server.os_name,
-        "os_version": server.os_version,
-        "processor": server.processor,
-        "timestamp": server.timestamp,
-        "processes": [{"pid": p.pid, "name": p.name} for p in server.processes],
-        "users": [{"username": u.username} for u in server.users]
-    }
-
-    return jsonify(result), 200
+    try:
+        db.session.add(new_entry)
+        db.session.commit()
+        return jsonify({"message": "Datos almacenados correctamente"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    # Crear todas las tablas si no existen
+    db.create_all()
+    app.run(host="0.0.0.0", port=5000)  # Asegúrate de que Flask escuche en todas las interfaces

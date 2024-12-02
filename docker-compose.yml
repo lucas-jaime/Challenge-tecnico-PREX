@@ -1,19 +1,25 @@
-version: '3.9'
+version: '3.8'
+
 services:
   api:
-    build:
-      context: ./api
+    build: ./api  # Directorio donde está tu Dockerfile de la API
     ports:
       - "5000:5000"
     volumes:
-      - ./api/data:/app/data
-    restart: always
+      - ./api:/app
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+    networks:
+      - prex-network
 
   agent:
-    build:
-      context: ./agent
-    environment:
-      - API_URL=http://api:5000/collect
-    depends_on:
-      - api
-    restart: on-failure
+    build: ./agent  # Directorio donde está tu Dockerfile del Agente
+    volumes:
+      - ./agent:/app
+    networks:
+      - prex-network
+
+networks:
+  prex-network:
+    driver: bridge

@@ -1,55 +1,35 @@
-# import os
-# import platform
-# import psutil
-# import requests
-
-# def collect_system_info():
-#     return {
-#         "processor": platform.processor(),  # Información sobre el procesador. 
-#         "processes": [p.info for p in psutil.process_iter(['pid', 'name'])], # Listado de procesos corriendo
-#         "users": [u.name for u in psutil.users()], # Usuarios con una sesión abierta en el sistema
-#         "os_name": platform.system(), # Nombre del sistema operativo
-#         "os_version": platform.version() # Versión del sistema operativo
-#     }
-
-# def send_data(api_url, data):
-#     response = requests.post(api_url, json=data)
-#     if response.status_code == 200:
-#         print("Data sent successfully")
-#     else:
-#         print("Failed to send data:", response.text)
-
-# if __name__ == "__main__":
-#     api_url = "http://<API_SERVER>/collect"
-#     data = collect_system_info()
-#     send_data(api_url, data)
-
-import os
-import platform
-import psutil
+import psutil  # Para obtener los procesos del sistema
+import platform  # Para obtener el nombre y versión del sistema operativo
 import requests
 
-API_URL = os.getenv("API_URL", "http://localhost:5000/collect")
+# Obtener la información del sistema operativo
+processor = platform.processor()
+os_name = platform.system()
+os_version = platform.version()
 
-def gather_data():
-    data = {
-        "os_name": platform.system(), # Nombre del sistema operativo
-        "os_version": platform.version(), # Versión del sistema operativo
-        "processor": platform.processor(), # Información sobre el procesador
-        "processes": [{"pid": p.pid, "name": p.name()} for p in psutil.process_iter(attrs=["pid", "name"])], # Listado de procesos corriendo
-        "users": [u.name for u in psutil.users()] # Usuarios con una sesión abierta en el sistema
-    }
-    return data
+# Obtener la lista de procesos
+process_list = [p.info['name'] for p in psutil.process_iter(['name'])]
 
-def send_data(data):
-    try:
-        response = requests.post(API_URL, json=data)
-        print("Datos enviados:", response.json())
-    except Exception as e:
-        print("Error al enviar datos:", e)
+# Obtener los usuarios conectados
+users = [user.name for user in psutil.users()]
 
-if __name__ == "__main__":
-    data = gather_data()
-    send_data(data)
+# Datos a enviar
+data = {
+    "processor": processor,
+    "process_list": process_list,
+    "users": users,
+    "os_name": os_name,
+    "os_version": os_version
+}
 
+# La URL de la API (reemplazar con la IP pública de EC2)
+url = "http://3.137.162.127:5000/collect_data"  # Aquí se usa la IP pública de tu EC2
 
+# Enviar los datos a la API
+response = requests.post(url, json=data)
+
+# Verificar si la solicitud fue exitosa
+if response.status_code == 200:
+    print("Datos enviados correctamente")
+else:
+    print(f"Error al enviar los datos: {response.status_code}")
