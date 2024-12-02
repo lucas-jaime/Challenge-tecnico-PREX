@@ -1,16 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
-# Configuración de la base de datos SQLite (embebida en la aplicación)
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mi_base_de_datos.db'  # Archivo SQLite local
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-with app.app_context():
-    db.create_all()
 
-# Definir el modelo de la base de datos
 class SystemInfo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     processor = db.Column(db.String(100))
@@ -19,12 +16,12 @@ class SystemInfo(db.Model):
     os_name = db.Column(db.String(100))
     os_version = db.Column(db.String(50))
 
-# Ruta para recibir los datos del agente
+
 @app.route('/collect_data', methods=['POST'])
 def collect_data():
     data = request.get_json()
 
-    # Crear una nueva entrada en la base de datos
+    
     new_entry = SystemInfo(
         processor=data['processor'],
         process_list=str(data['process_list']),
@@ -42,6 +39,7 @@ def collect_data():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # Crear todas las tablas si no existen
-    db.create_all()
-    app.run(host="0.0.0.0", port=5000)  # Asegúrate de que Flask escuche en todas las interfaces
+    with app.app_context():
+        db.create_all()
+        app.run(host="0.0.0.0", port=5000) 
+        
